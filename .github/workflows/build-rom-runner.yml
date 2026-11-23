@@ -1,0 +1,65 @@
+name: Build ROM Runner APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: "Build variant (debug or release)"
+        required: true
+        default: "debug"
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  build-apk:
+    name: Build ROM Runner Android App
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Make Gradle Wrapper Executable
+        run: |
+          chmod +x rom_runner_app/gradlew
+
+      - name: Build ROM Runner APK
+        env:
+          BUILD_TYPE: ${{ github.event.inputs.build_type || 'debug' }}
+        run: |
+          cd rom_runner_app
+          if [ "$BUILD_TYPE" = "release" ]; then
+            ./gradlew assembleRelease
+          else
+            ./gradlew assembleDebug
+          fi
+
+      - name: Collect Built APK Artifacts
+        run: |
+          mkdir -p dist
+          find rom_runner_app -type f -name "*.apk" -exec cp {} dist/ \;
+          ls -lh dist/
+
+      - name: Upload ROM Runner APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: rom-runner-apk-${{ github.run_number }}
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 14
