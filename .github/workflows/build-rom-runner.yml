@@ -27,7 +27,7 @@ jobs:
           fetch-depth: 1
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -35,15 +35,22 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Make Gradle Wrapper Executable
-        run: |
-          chmod +x rom_runner_app/gradlew
-
-      - name: Build ROM Runner APK
+      - name: Detect Project Directory & Build APK
         env:
           BUILD_TYPE: ${{ github.event.inputs.build_type || 'debug' }}
         run: |
-          cd rom_runner_app
+          set -euo pipefail
+          if [ -f "rom_runner_app/gradlew" ]; then
+            PROJECT_DIR="rom_runner_app"
+          elif [ -f "gradlew" ]; then
+            PROJECT_DIR="."
+          else
+            echo "Error: gradlew not found! Please add your Android project files (gradlew, app/, build.gradle) to the repository."
+            exit 1
+          fi
+
+          cd "$PROJECT_DIR"
+          chmod +x gradlew
           if [ "$BUILD_TYPE" = "release" ]; then
             ./gradlew assembleRelease
           else
@@ -53,7 +60,7 @@ jobs:
       - name: Collect Built APK Artifacts
         run: |
           mkdir -p dist
-          find rom_runner_app -type f -name "*.apk" -exec cp {} dist/ \;
+          find . -type f -name "*.apk" -exec cp {} dist/ \;
           ls -lh dist/
 
       - name: Upload ROM Runner APK
@@ -63,3 +70,4 @@ jobs:
           path: dist/*.apk
           if-no-files-found: error
           retention-days: 14
+          
